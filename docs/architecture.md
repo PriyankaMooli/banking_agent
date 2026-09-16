@@ -4,10 +4,19 @@ Skeleton layout for the banking agent, organized by responsibility:
 
 - **ui/** — Chainlit chat frontend (`app.py`). Renders the conversation,
   reads the logged-in user from the session, and calls into the gateway.
-- **gateway/** — The single entry point into the backend.
-  - `api.py` — forwards a request to the backend. This is what the UI calls.
-  - `backend.py` — dummy business logic (canned responses). Swap for real
-    HTTP calls to backend services (accounts, transfers, transactions) later.
+- **gateway/** — The single entry point the UI calls into.
+  - `api.py` — forwards a request to `gateway/backend.py`. This is what the UI calls.
+  - `backend.py` — HTTP client for the backend API (`POST /chat`). Only
+    module that knows the backend is a separate network service.
+- **backend/** — Standalone FastAPI service. Receives chat requests over
+  HTTP and calls the agent layer.
+  - `main.py` — FastAPI app, `POST /chat` endpoint, `GET /health`.
+  - `schemas.py` — request/response models.
+- **agent/** — The agent layer: owns the system prompt and hands tools to
+  the model's automatic function calling.
+  - `agent.py` — `BankingAgent`, backed by the Gemini API (`google-genai`).
+  - `tools.py` — mock account/transaction/card/loan data, exposed as tools.
+    Swap the function bodies for real account-service calls later.
 - **identity/** — Authentication:
   - `auth.py` — *authentication* ("who is this user"). A Chainlit
     `@cl.oauth_callback` backed by Keycloak SSO (see
@@ -17,14 +26,24 @@ Skeleton layout for the banking agent, organized by responsibility:
 ## Request flow
 
 ```
-ui/app.py --on login-->     identity/auth.oauth_callback(...)         (authenticates via Keycloak)
+ui/app.py --on login-->     identity/auth.oauth_callback(...)           (authenticates via Keycloak)
 ui/app.py --per message-->  gateway/api.get_response(message, history)
                                  |
                                  v
-                             gateway/backend.answer(message, history)
+                             gateway/backend.answer(message, history)    (HTTP POST /chat)
+                                 |
+                                 v
+                             backend/main.chat(request)                  (separate FastAPI process, :8001)
+                                 |
+                                 v
+                             agent/agent.BankingAgent.run(message, history)
+                                 |
+                                 v
+                             Gemini API  <-->  agent/tools.py (mock account data)
 ```
 
-Everything below the UI is still in-process function calls, not real
-network services. When a real backend exists, only `gateway/backend.py`'s
-internals change (e.g., an HTTP call instead of a canned string) — the
-UI's call into the gateway stays the same.
+`gateway/backend.py` is the one seam between the UI process and the
+backend process — it's the only module that knows the backend lives over
+HTTP. `agent/tools.py` is the seam between the agent and real account
+data — swap its function bodies for real service calls without touching
+the agent's tool-use loop or `backend/main.py`.

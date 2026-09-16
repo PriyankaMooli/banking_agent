@@ -1,40 +1,37 @@
-"""Dummy backend business logic, fronted by the gateway.
+"""Backend client — calls the backend API over HTTP.
 
-Swap `answer` for a real HTTP/LLM call to backend banking services
-later; the gateway only depends on this function's signature.
+The backend API (backend/main.py) receives the request and calls the agent
+layer (agent/agent.py). Run it separately with:
+    uvicorn backend.main:app --port 8001
 """
 
-import random
-import time
+import logging
+import os
 
-_CANNED_RESPONSES = {
-    "balance": "Your checking account balance is $4,231.87.",
-    "transfer": "Sure — how much would you like to transfer, and to which account?",
-    "transaction": "Your last transaction was a $52.40 charge at Whole Foods on Sep 12.",
-    "card": "Your card ending in 4471 is active and in good standing.",
-    "loan": "You currently have no active loans on this account.",
-    "hello": "Hi! I'm your banking assistant. Ask me about balances, transfers, or recent transactions.",
-}
+import httpx
 
-_FALLBACK_RESPONSES = [
-    "Got it — let me look into that for you.",
-    "I can help with that. Could you give me a bit more detail?",
-    "Thanks for the info. Here's a placeholder response until the real API is wired up.",
-]
+BACKEND_URL = os.environ.get("BACKEND_URL", "http://localhost:8001")
+
+logger = logging.getLogger(__name__)
 
 
 def answer(message: str, history: list[dict]) -> str:
-    """Return a dummy backend reply for the given user message.
+    """Return the backend API's reply for the given user message.
 
-    `history` is the list of prior {"role", "content"} turns, unused by
-    the dummy implementation but kept in the signature so the real
-    backend can use it for context.
+    `history` is the list of prior {"role", "content"} turns, forwarded
+    so the agent layer has conversation context.
     """
-    time.sleep(0.4)  # simulate network latency
-
-    lowered = message.lower()
-    for keyword, response in _CANNED_RESPONSES.items():
-        if keyword in lowered:
-            return response
-
-    return random.choice(_FALLBACK_RESPONSES)
+    try:
+        response = httpx.post(
+            f"{BACKEND_URL}/chat",
+            json={"message": message, "history": history},
+            timeout=60.0,
+        )
+        response.raise_for_status()
+        return response.json()["reply"]
+    except httpx.HTTPError:
+        logger.exception("Backend API call failed")
+        return (
+            "Sorry, I'm having trouble reaching the banking backend right now. "
+            "Please try again shortly."
+        )
