@@ -41,3 +41,18 @@ def get_card_status() -> dict:
 def get_loan_status() -> dict:
     """Get the customer's active loans, if any."""
     return {"active_loans": []}
+
+
+def get_checkbook_info() -> dict:
+    """Get the customer's checkbook ordering information."""
+    return {"checkbook_available": True, "checks_remaining": 24}
+
+
+def get_address() -> dict:
+    """Get the customer's mailing address on file."""
+    return {"address": "123 Main Street, Springfield, NY 10001"}
+
+
+def get_credit_limit() -> dict:
+    """Get the customer's current credit limit and available credit."""
+    return {"credit_limit": 5000.00, "available_credit": 5000.00}

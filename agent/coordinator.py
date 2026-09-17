@@ -4,7 +4,10 @@ from typing import TypedDict
 
 from langgraph.graph import END, START, StateGraph
 
+from agent.accounts import AccountsAgent
 from agent.agent import BankingAgent
+from agent.service import ServiceAgent
+from agent.transactions import TransactionsAgent
 from agent.tools import (
     get_balance,
     get_card_status,
@@ -18,7 +21,7 @@ class CoordinatorState(TypedDict):
     history: list[dict]
     plan: list[str]
     next_agent: int
-    findings: list[tuple[str, dict]]
+    findings: list[tuple[str, object]]
     reply: str
 
 
@@ -32,7 +35,8 @@ SPECIALISTS = {
 INTENT_KEYWORDS = {
     "balance": ("balance", "checking", "savings", "account"),
     "transactions": ("transaction", "transactions", "spent", "purchase", "payment"),
-    "card": ("card", "debit", "credit"),
+    "service": ("checkbook", "checks", "address", "mailing", "credit limit", "credit-limit"),
+    "card": ("card", "debit"),
     "loan": ("loan", "borrow", "lending"),
 }
 
@@ -44,6 +48,8 @@ def _plan(state: CoordinatorState) -> dict:
         for name, keywords in INTENT_KEYWORDS.items()
         if any(keyword in message for keyword in keywords)
     ]
+    if "credit limit" in message or "credit-limit" in message:
+        plan = [name for name in plan if name != "card"]
     return {"plan": plan, "next_agent": 0}
 
 
@@ -51,7 +57,14 @@ def _dispatch(state: CoordinatorState) -> dict:
     if state["next_agent"] >= len(state["plan"]):
         return {}
     specialist_name = state["plan"][state["next_agent"]]
-    result = SPECIALISTS[specialist_name]()
+    if specialist_name == "balance":
+        result = AccountsAgent().run(state["message"], state["history"])
+    elif specialist_name == "transactions":
+        result = TransactionsAgent().run(state["message"], state["history"])
+    elif specialist_name == "service":
+        result = ServiceAgent().run(state["message"], state["history"])
+    else:
+        result = SPECIALISTS[specialist_name]()
     return {
         "findings": [*state["findings"], (specialist_name, result)],
         "next_agent": state["next_agent"] + 1,
