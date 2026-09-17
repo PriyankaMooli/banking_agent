@@ -10,11 +10,11 @@ load_dotenv()
 
 from fastapi import FastAPI
 
-from agent.agent import BankingAgent
+from agent.coordinator import CoordinatorAgent
 from backend.schemas import ChatRequest, ChatResponse
 
 app = FastAPI(title="Banking Agent Backend")
-agent = BankingAgent()
+agent = CoordinatorAgent()
 
 
 @app.post("/chat", response_model=ChatResponse)

@@ -12,9 +12,11 @@ Skeleton layout for the banking agent, organized by responsibility:
   HTTP and calls the agent layer.
   - `main.py` — FastAPI app, `POST /chat` endpoint, `GET /health`.
   - `schemas.py` — request/response models.
-- **agent/** — The agent layer: owns the system prompt and hands tools to
-  the model's automatic function calling.
+- **agent/** — The agent layer: plans requests with LangGraph, runs the
+  relevant banking specialists in order, and uses Gemini to compose the reply.
   - `agent.py` — `BankingAgent`, backed by the Gemini API (`google-genai`).
+  - `coordinator.py` — `CoordinatorAgent`, backed by LangGraph, which routes
+    single- and multi-intent requests through the specialist tools.
   - `tools.py` — mock account/transaction/card/loan data, exposed as tools.
     Swap the function bodies for real account-service calls later.
 - **identity/** — Authentication:
@@ -36,10 +38,16 @@ ui/app.py --per message-->  gateway/api.get_response(message, history)
                              backend/main.chat(request)                  (separate FastAPI process, :8001)
                                  |
                                  v
-                             agent/agent.BankingAgent.run(message, history)
+                             agent/coordinator.CoordinatorAgent.run(message, history)
                                  |
                                  v
-                             Gemini API  <-->  agent/tools.py (mock account data)
+                           LangGraph coordinator
+                            /          \
+                             v            v
+                         specialist tools   BankingAgent
+                                    |
+                                    v
+                                  Gemini API
 ```
 
 `gateway/backend.py` is the one seam between the UI process and the

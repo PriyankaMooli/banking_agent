@@ -2,5 +2,6 @@ chainlit
 fastapi
 uvicorn[standard]
 google-genai
+langgraph
 httpx
 python-dotenv
