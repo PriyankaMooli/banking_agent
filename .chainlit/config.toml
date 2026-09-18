@@ -72,13 +72,13 @@ reaction_on_message_received = false
 
 [features.audio]
     # Enable audio features
-    enabled = false
+    enabled = true
     # Sample rate of the audio
     sample_rate = 24000
 
 [features.mcp]
     # Enable Model Context Protocol (MCP) features
-    enabled = false
+    enabled = true
 
     # Developer-configured MCP servers. Users can connect them by name.
     # Supported types: "stdio" (server-side process), "sse", "streamable-http" (outbound HTTP).
@@ -93,6 +93,24 @@ reaction_on_message_received = false
     # # Optional: environment variables merged over the default subprocess
     # # environment at spawn time. Never exposed to clients.
     # env = { GITHUB_TOKEN = "..." }
+
+    [[features.mcp.servers]]
+    name = "accounts"
+    type = "stdio"
+    command = "python"
+    args = ["-m", "agent.accounts_mcp"]
+
+    [[features.mcp.servers]]
+    name = "transactions"
+    type = "stdio"
+    command = "python"
+    args = ["-m", "agent.transactions_mcp"]
+
+    [[features.mcp.servers]]
+    name = "service"
+    type = "stdio"
+    command = "python"
+    args = ["-m", "agent.service_mcp"]
     #
     # [[features.mcp.servers]]
     # name = "my-sse-server"

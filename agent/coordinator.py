@@ -6,6 +6,7 @@ from langgraph.graph import END, START, StateGraph
 
 from agent.accounts import AccountsAgent
 from agent.agent import BankingAgent
+from agent.intent_classifier import IntentClassifier
 from agent.service import ServiceAgent
 from agent.transactions import TransactionsAgent
 from agent.tools import (
@@ -41,8 +42,7 @@ INTENT_KEYWORDS = {
 }
 
 
-def _plan(state: CoordinatorState) -> dict:
-    message = state["message"].lower()
+def _keyword_plan(message: str) -> list[str]:
     plan = [
         name
         for name, keywords in INTENT_KEYWORDS.items()
@@ -50,6 +50,15 @@ def _plan(state: CoordinatorState) -> dict:
     ]
     if "credit limit" in message or "credit-limit" in message:
         plan = [name for name in plan if name != "card"]
+    return plan
+
+
+def _plan(state: CoordinatorState, classifier: IntentClassifier | None = None) -> dict:
+    message = state["message"].lower()
+    try:
+        plan = classifier.classify(state["message"]) if classifier else _keyword_plan(message)
+    except Exception:
+        plan = _keyword_plan(message)
     return {"plan": plan, "next_agent": 0}
 
 
@@ -91,9 +100,9 @@ def _respond(state: CoordinatorState) -> dict:
     return {"reply": reply}
 
 
-def _build_graph():
+def _build_graph(classifier: IntentClassifier | None = None):
     graph = StateGraph(CoordinatorState)
-    graph.add_node("plan", _plan)
+    graph.add_node("plan", lambda state: _plan(state, classifier))
     graph.add_node("dispatch", _dispatch)
     graph.add_node("respond", _respond)
     graph.add_edge(START, "plan")
@@ -107,7 +116,11 @@ class CoordinatorAgent:
     """Plan and run the specialist agents needed for a banking request."""
 
     def __init__(self) -> None:
-        self._graph = _build_graph()
+        try:
+            classifier = IntentClassifier()
+        except Exception:
+            classifier = None
+        self._graph = _build_graph(classifier)
 
     def run(self, message: str, history: list[dict]) -> str:
         result = self._graph.invoke(
