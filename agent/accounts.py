@@ -5,17 +5,25 @@ import os
 from google import genai
 from google.genai import types
 
-from agent.tools import get_balance
+from agent.mcp_bridge import call_mcp_tool
 
 MODEL = "gemini-3.5-flash-lite"
 
 SYSTEM_PROMPT = (
-    "You are the accounts specialist for a banking assistant. Handle only "
-    "balance and account questions. Always use the get_balance tool before "
-    "answering. You may compare account balances or calculate a total when "
-    "the user asks, but never invent account information. Be concise and "
-    "clearly identify each account and amount."
+    "You are the accounts specialist and MCP tool selector. Handle only "
+    "balance and account questions. Select get_account_balance when account "
+    "data is needed. Use only the MCP result; never invent account information. "
+    "You may compare verified balances or calculate a verified total."
 )
+
+
+def get_account_balance(account: str = "checking") -> dict:
+    """Call the Accounts MCP server for one account balance."""
+    return call_mcp_tool(
+        "agent.accounts_mcp",
+        "get_account_balance",
+        {"account": account},
+    )
 
 
 class AccountsAgent:
@@ -25,7 +33,7 @@ class AccountsAgent:
         self._client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
         self._config = types.GenerateContentConfig(
             system_instruction=SYSTEM_PROMPT,
-            tools=[get_balance],
+            tools=[get_account_balance],
         )
 
     def run(self, message: str, history: list[dict]) -> str:

@@ -5,18 +5,25 @@ import os
 from google import genai
 from google.genai import types
 
-from agent.tools import get_recent_transactions
+from agent.mcp_bridge import call_mcp_tool
 
 MODEL = "gemini-3.5-flash-lite"
 
 SYSTEM_PROMPT = (
-    "You are the transactions specialist for a banking assistant. Handle only "
-    "transaction and spending questions. Always use the "
-    "get_recent_transactions tool before answering. You may summarize, count, "
-    "or calculate totals from the returned transactions, but never invent a "
-    "transaction, merchant, date, or amount. Be concise and clearly explain "
-    "debits and credits."
+    "You are the transactions specialist and MCP tool selector. Handle only "
+    "transaction and spending questions. Select get_account_transactions when "
+    "transaction data is needed. Use only MCP results; never invent a "
+    "transaction, merchant, date, or amount."
 )
+
+
+def get_account_transactions(count: int = 3) -> dict:
+    """Call the Transactions MCP server for recent transactions."""
+    return call_mcp_tool(
+        "agent.transactions_mcp",
+        "get_account_transactions",
+        {"count": count},
+    )
 
 
 class TransactionsAgent:
@@ -26,7 +33,7 @@ class TransactionsAgent:
         self._client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
         self._config = types.GenerateContentConfig(
             system_instruction=SYSTEM_PROMPT,
-            tools=[get_recent_transactions],
+            tools=[get_account_transactions],
         )
 
     def run(self, message: str, history: list[dict]) -> str:

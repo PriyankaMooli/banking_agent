@@ -5,17 +5,30 @@ import os
 from google import genai
 from google.genai import types
 
-from agent.tools import get_address, get_checkbook_info, get_credit_limit
+from agent.mcp_bridge import call_mcp_tool
 
 MODEL = "gemini-3.5-flash-lite"
 
 SYSTEM_PROMPT = (
-    "You are the banking service specialist. Handle only checkbook, mailing "
-    "address, and credit-limit questions. Always use the relevant tool before "
-    "answering. You may explain the verified service information, but never "
-    "invent an address, checkbook detail, or credit limit. Be concise and "
-    "protect sensitive information by sharing only what the tool returns."
+    "You are the banking service specialist and MCP tool selector. Handle only "
+    "checkbook, mailing address, and credit-limit questions. Select the relevant "
+    "MCP tool before answering. Use only MCP results; never invent service data."
 )
+
+
+def get_checkbook() -> dict:
+    """Call the Service MCP server for checkbook information."""
+    return call_mcp_tool("agent.service_mcp", "get_checkbook", {})
+
+
+def get_customer_address() -> dict:
+    """Call the Service MCP server for the customer's address."""
+    return call_mcp_tool("agent.service_mcp", "get_customer_address", {})
+
+
+def get_customer_credit_limit() -> dict:
+    """Call the Service MCP server for credit-limit information."""
+    return call_mcp_tool("agent.service_mcp", "get_customer_credit_limit", {})
 
 
 class ServiceAgent:
@@ -25,7 +38,7 @@ class ServiceAgent:
         self._client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
         self._config = types.GenerateContentConfig(
             system_instruction=SYSTEM_PROMPT,
-            tools=[get_checkbook_info, get_address, get_credit_limit],
+            tools=[get_checkbook, get_customer_address, get_customer_credit_limit],
         )
 
     def run(self, message: str, history: list[dict]) -> str:

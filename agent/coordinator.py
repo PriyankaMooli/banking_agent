@@ -9,12 +9,7 @@ from agent.agent import BankingAgent
 from agent.intent_classifier import IntentClassifier
 from agent.service import ServiceAgent
 from agent.transactions import TransactionsAgent
-from agent.tools import (
-    get_balance,
-    get_card_status,
-    get_loan_status,
-    get_recent_transactions,
-)
+from agent.tools import get_card_status, get_loan_status
 
 
 class CoordinatorState(TypedDict):
@@ -27,8 +22,6 @@ class CoordinatorState(TypedDict):
 
 
 SPECIALISTS = {
-    "balance": get_balance,
-    "transactions": get_recent_transactions,
     "card": get_card_status,
     "loan": get_loan_status,
 }
