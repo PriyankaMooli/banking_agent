@@ -13,13 +13,15 @@ load_dotenv(PROJECT_ROOT / ".env")
 
 from gateway.api import get_response
 import identity.auth  # noqa: F401 - registers the Keycloak oauth_callback
+from session_store import SESSION_STORE
 
 
 @cl.on_chat_start
 async def start():
     user = cl.user_session.get("user")
     name = user.display_name or user.identifier if user else "there"
-    cl.user_session.set("history", [])
+    session_id = user.identifier if user else "anonymous"
+    cl.user_session.set("history", SESSION_STORE.get_history(session_id))
     await cl.Message(
         content=f"Hi {name}! I'm your banking assistant. How can I help today?"
     ).send()
@@ -32,8 +34,9 @@ async def on_message(message: cl.Message):
         await cl.Message(content="Please sign in before using banking tools.").send()
         return
 
-    history = cl.user_session.get("history")
-    history.append({"role": "user", "content": message.content})
+    session_id = user.identifier
+    SESSION_STORE.append_turn(session_id, "user", message.content)
+    history = SESSION_STORE.get_history(session_id)
 
     principal = {
         "subject": user.identifier,
@@ -41,5 +44,6 @@ async def on_message(message: cl.Message):
     }
     reply = get_response(message.content, history, principal)
 
-    history.append({"role": "assistant", "content": reply})
+    SESSION_STORE.append_turn(session_id, "assistant", reply)
+    cl.user_session.set("history", SESSION_STORE.get_history(session_id))
     await cl.Message(content=reply).send()
