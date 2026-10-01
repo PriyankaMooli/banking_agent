@@ -6,6 +6,7 @@ from google import genai
 from google.genai import types
 
 from agent.mcp_bridge import call_mcp_tool
+from privacy.redaction import sanitize_for_llm
 
 MODEL = "gemini-3.5-flash-lite"
 
@@ -43,6 +44,7 @@ class ServiceAgent:
 
     def run(self, message: str, history: list[dict]) -> str:
         """Answer one checkbook, address, or credit-limit request."""
+        safe_message, safe_history = sanitize_for_llm(message, history)
         chat = self._client.chats.create(
             model=MODEL,
             config=self._config,
@@ -51,8 +53,8 @@ class ServiceAgent:
                     role="model" if turn["role"] == "assistant" else "user",
                     parts=[types.Part(text=turn["content"])],
                 )
-                for turn in history
+                for turn in safe_history
             ],
         )
-        response = chat.send_message(message)
+        response = chat.send_message(safe_message)
         return response.text

@@ -6,6 +6,8 @@ import os
 from google import genai
 from google.genai import types
 
+from privacy.redaction import redact_pii
+
 MODEL = "gemini-3.5-flash-lite"
 SUPPORTED_INTENTS = ("balance", "transactions", "service", "card", "loan")
 
@@ -32,11 +34,12 @@ class IntentClassifier:
 
     def classify(self, message: str) -> list[str]:
         """Return validated intent names, or raise if Gemini returns bad output."""
+        safe_message = redact_pii(message)
         chat = self._client.chats.create(
             model=MODEL,
             config=self._config,
         )
-        response = chat.send_message(message)
+        response = chat.send_message(safe_message)
         payload = json.loads(response.text)
         intents = payload["intents"]
         if not isinstance(intents, list):
