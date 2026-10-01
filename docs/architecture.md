@@ -23,16 +23,18 @@ Skeleton layout for the banking agent, organized by responsibility:
   - `auth.py` — *authentication* ("who is this user"). A Chainlit
     `@cl.oauth_callback` backed by Keycloak SSO (see
     [identity/keycloak/README.md](../identity/keycloak/README.md)).
+  - `principal.py` and `authorization.py` — sign the authenticated tier
+    across the UI/backend boundary and enforce per-tool authorization.
 - **docs/** — Project documentation.
 
 ## Request flow
 
 ```
 ui/app.py --on login-->     identity/auth.oauth_callback(...)           (authenticates via Keycloak)
-ui/app.py --per message-->  gateway/api.get_response(message, history)
+ui/app.py --per message-->  gateway/api.get_response(message, history, principal)
                                  |
                                  v
-                             gateway/backend.answer(message, history)    (HTTP POST /chat)
+                             gateway/backend.answer(..., principal)       (signed HTTP POST /chat)
                                  |
                                  v
                              backend/main.chat(request)                  (separate FastAPI process, :8001)

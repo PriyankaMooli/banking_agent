@@ -10,12 +10,14 @@ import os
 
 import httpx
 
+from identity.principal import sign_principal
+
 BACKEND_URL = os.environ.get("BACKEND_URL", "http://localhost:8001")
 
 logger = logging.getLogger(__name__)
 
 
-def answer(message: str, history: list[dict]) -> str:
+def answer(message: str, history: list[dict], principal: dict[str, str]) -> str:
     """Return the backend API's reply for the given user message.
 
     `history` is the list of prior {"role", "content"} turns, forwarded
@@ -25,6 +27,7 @@ def answer(message: str, history: list[dict]) -> str:
         response = httpx.post(
             f"{BACKEND_URL}/chat",
             json={"message": message, "history": history},
+            headers={"X-Authenticated-Principal": sign_principal(**principal)},
             timeout=60.0,
         )
         response.raise_for_status()

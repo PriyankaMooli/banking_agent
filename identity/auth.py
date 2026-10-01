@@ -1,3 +1,4 @@
+
 """Keycloak SSO login for the banking assistant.
 
 Chainlit's built-in Keycloak OAuth provider handles the actual
@@ -25,6 +26,11 @@ async def oauth_callback(
     default_app_user.display_name = raw_user_data.get(
         "preferred_username", default_app_user.identifier
     )
-    # Dummy role assignment — swap for real Keycloak realm roles/scopes later.
-    default_app_user.metadata["role"] = "customer"
+    roles = set(raw_user_data.get("realm_access", {}).get("roles", []))
+    roles.update(raw_user_data.get("roles", []))
+    tier_claim = raw_user_data.get("tier")
+    is_privileged = tier_claim == "privileged" or bool(
+        {"privileged", "banking-privileged"}.intersection(roles)
+    )
+    default_app_user.metadata["tier"] = "privileged" if is_privileged else "customer"
     return default_app_user

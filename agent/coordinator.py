@@ -10,11 +10,13 @@ from agent.intent_classifier import IntentClassifier
 from agent.service import ServiceAgent
 from agent.transactions import TransactionsAgent
 from agent.tools import get_card_status, get_loan_status
+from identity.authorization import use_principal
 
 
 class CoordinatorState(TypedDict):
     message: str
     history: list[dict]
+    principal: dict[str, str]
     plan: list[str]
     next_agent: int
     findings: list[tuple[str, object]]
@@ -59,14 +61,15 @@ def _dispatch(state: CoordinatorState) -> dict:
     if state["next_agent"] >= len(state["plan"]):
         return {}
     specialist_name = state["plan"][state["next_agent"]]
-    if specialist_name == "balance":
-        result = AccountsAgent().run(state["message"], state["history"])
-    elif specialist_name == "transactions":
-        result = TransactionsAgent().run(state["message"], state["history"])
-    elif specialist_name == "service":
-        result = ServiceAgent().run(state["message"], state["history"])
-    else:
-        result = SPECIALISTS[specialist_name]()
+    with use_principal(state["principal"]):
+        if specialist_name == "balance":
+            result = AccountsAgent().run(state["message"], state["history"])
+        elif specialist_name == "transactions":
+            result = TransactionsAgent().run(state["message"], state["history"])
+        elif specialist_name == "service":
+            result = ServiceAgent().run(state["message"], state["history"])
+        else:
+            result = SPECIALISTS[specialist_name]()
     return {
         "findings": [*state["findings"], (specialist_name, result)],
         "next_agent": state["next_agent"] + 1,
@@ -80,16 +83,17 @@ def _route(state: CoordinatorState) -> str:
 
 
 def _respond(state: CoordinatorState) -> dict:
-    if not state["findings"]:
-        reply = BankingAgent().run(state["message"], state["history"])
-    else:
-        findings = "\n".join(f"{name}: {result}" for name, result in state["findings"])
-        prompt = (
-            f"User request: {state['message']}\n"
-            f"Verified specialist results:\n{findings}\n\n"
-            "Answer the user using only these verified results. Be concise and friendly."
-        )
-        reply = BankingAgent().run(prompt, state["history"])
+    with use_principal(state["principal"]):
+        if not state["findings"]:
+            reply = BankingAgent().run(state["message"], state["history"])
+        else:
+            findings = "\n".join(f"{name}: {result}" for name, result in state["findings"])
+            prompt = (
+                f"User request: {state['message']}\n"
+                f"Verified specialist results:\n{findings}\n\n"
+                "Answer the user using only these verified results. Be concise and friendly."
+            )
+            reply = BankingAgent().run(prompt, state["history"])
     return {"reply": reply}
 
 
@@ -115,11 +119,12 @@ class CoordinatorAgent:
             classifier = None
         self._graph = _build_graph(classifier)
 
-    def run(self, message: str, history: list[dict]) -> str:
+    def run(self, message: str, history: list[dict], principal: dict[str, str]) -> str:
         result = self._graph.invoke(
             {
                 "message": message,
                 "history": history,
+                "principal": principal,
                 "plan": [],
                 "next_agent": 0,
                 "findings": [],

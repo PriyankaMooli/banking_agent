@@ -9,6 +9,8 @@ from typing import Any
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
+from identity.authorization import authorize_tool
+
 
 async def _call_tool(server_module: str, tool_name: str, arguments: dict[str, Any]) -> dict:
     server = StdioServerParameters(
@@ -32,6 +34,7 @@ async def _call_tool(server_module: str, tool_name: str, arguments: dict[str, An
 
 def call_mcp_tool(server_module: str, tool_name: str, arguments: dict[str, Any]) -> dict:
     """Call one MCP tool synchronously from a Gemini function tool."""
+    authorize_tool(tool_name)
     try:
         asyncio.get_running_loop()
     except RuntimeError:

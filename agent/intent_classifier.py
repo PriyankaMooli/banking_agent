@@ -32,11 +32,11 @@ class IntentClassifier:
 
     def classify(self, message: str) -> list[str]:
         """Return validated intent names, or raise if Gemini returns bad output."""
-        response = self._client.models.generate_content(
+        chat = self._client.chats.create(
             model=MODEL,
-            contents=message,
             config=self._config,
         )
+        response = chat.send_message(message)
         payload = json.loads(response.text)
         intents = payload["intents"]
         if not isinstance(intents, list):

@@ -8,5 +8,5 @@ only depends on this module's `get_response` signature.
 from gateway import backend
 
 
-def get_response(message: str, history: list) -> str:
-    return backend.answer(message, history)
+def get_response(message: str, history: list, principal: dict[str, str]) -> str:
+    return backend.answer(message, history, principal)

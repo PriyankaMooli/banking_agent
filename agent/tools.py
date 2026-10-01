@@ -1,5 +1,7 @@
 """Mock banking tools the agent can call. Swap for real account-service calls later."""
 
+from identity.authorization import authorize_tool
+
 _ACCOUNTS = {
     "checking": 4231.87,
     "savings": 12890.00,
@@ -35,11 +37,13 @@ def get_recent_transactions(count: int = 3) -> dict:
 
 def get_card_status() -> dict:
     """Get the status of the customer's debit/credit card."""
+    authorize_tool("get_card_status")
     return {"card_last4": "4471", "status": "active"}
 
 
 def get_loan_status() -> dict:
     """Get the customer's active loans, if any."""
+    authorize_tool("get_loan_status")
     return {"active_loans": []}
 
 
