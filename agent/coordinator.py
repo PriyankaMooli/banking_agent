@@ -6,6 +6,7 @@ from langgraph.graph import END, START, StateGraph
 
 from agent.accounts import get_account_balance
 from agent.agent import BankingAgent
+from agent.prompts import get_prompt
 from agent.service import get_checkbook, get_customer_address, get_customer_credit_limit
 from agent.transactions import get_account_transactions
 from agent.tools import get_card_status, get_loan_status
@@ -108,11 +109,7 @@ def _respond(state: CoordinatorState) -> dict:
             reply = ThirdPartyReasoningModel().generate(
                 prompt,
                 history,
-                system_instruction=(
-                    "You are a banking assistant handling a complex reasoning request. "
-                    "Use only the supplied verified tool results for account facts. "
-                    "Never invent financial information."
-                ),
+                system_instruction=get_prompt("complex_reasoning").text,
             )
         else:
             reply = BankingAgent().run(prompt, history)

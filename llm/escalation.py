@@ -7,6 +7,7 @@ import os
 from google import genai
 from google.genai import types
 
+from agent.prompts import get_prompt
 from privacy.redaction import redact_pii, sanitize_for_llm
 
 
@@ -24,13 +25,15 @@ class ThirdPartyReasoningModel:
         self,
         prompt: str,
         history: list[dict[str, str]] | None = None,
-        system_instruction: str = "",
+        system_instruction: str | None = None,
     ) -> str:
         safe_prompt, safe_history = sanitize_for_llm(prompt, history)
         chat = self._client.chats.create(
             model=self._model,
             config=types.GenerateContentConfig(
-                system_instruction=redact_pii(system_instruction)
+                system_instruction=redact_pii(
+                    system_instruction or get_prompt("complex_reasoning").text
+                )
             ),
             history=[
                 types.Content(

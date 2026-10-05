@@ -26,6 +26,9 @@ Skeleton layout for the banking agent, organized by responsibility:
   - `principal.py` and `authorization.py` — sign the authenticated tier
     across the UI/backend boundary and enforce per-tool authorization.
 - **docs/** — Project documentation.
+- **agent/prompts.py** — Versioned system prompts for each model role. Prompt
+  versions and behavior changes are tracked in
+  [prompt-changelog.md](prompt-changelog.md).
 
 ## Request flow
 

@@ -10,14 +10,7 @@ to call each tool and feeds results back in.
 
 from llm.provider import create_reasoning_model
 from privacy.redaction import sanitize_for_llm
-
-SYSTEM_PROMPT = (
-    "You are a helpful banking assistant. The coordinator may include "
-    "verified banking tool results in the request. Use only those results "
-    "for account-specific facts, and never claim to have called a tool. "
-    "If a requested fact is not included, say it is unavailable. For "
-    "general questions, be concise and friendly. Never invent account data."
-)
+from agent.prompts import get_prompt
 
 
 class BankingAgent:
@@ -35,5 +28,5 @@ class BankingAgent:
         return self._reasoning_model.generate(
             safe_message,
             safe_history,
-            system_instruction=SYSTEM_PROMPT,
+            system_instruction=get_prompt("banking_response").text,
         )

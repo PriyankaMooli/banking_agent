@@ -6,21 +6,11 @@ import os
 from google import genai
 from google.genai import types
 
+from agent.prompts import get_prompt
 from privacy.redaction import redact_pii
 
 MODEL = "gemini-3.5-flash-lite"
 SUPPORTED_INTENTS = ("balance", "transactions", "service", "card", "loan")
-
-SYSTEM_PROMPT = (
-    "Classify banking user requests for routing. Return JSON only in the form "
-    '{"intents": ["balance", "transactions"]}. Choose zero or more intents '
-    "from this exact list: balance, transactions, service, card, loan. "
-    "Use balance for account balances, transactions for purchases and spending, "
-    "service for checkbooks, addresses, and credit limits, card for card status, "
-    "and loan for loan status. Preserve the order in which the user asks for "
-    "topics. For greetings or unrelated questions, return an empty list."
-)
-
 
 class IntentClassifier:
     """Classify a message into the coordinator's supported specialist routes."""
@@ -28,7 +18,7 @@ class IntentClassifier:
     def __init__(self) -> None:
         self._client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
         self._config = types.GenerateContentConfig(
-            system_instruction=SYSTEM_PROMPT,
+            system_instruction=get_prompt("intent_classifier").text,
             response_mime_type="application/json",
         )
 

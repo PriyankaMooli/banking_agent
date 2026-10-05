@@ -6,16 +6,10 @@ from google import genai
 from google.genai import types
 
 from agent.mcp_bridge import call_mcp_tool
+from agent.prompts import get_prompt
 from privacy.redaction import sanitize_for_llm
 
 MODEL = "gemini-3.5-flash-lite"
-
-SYSTEM_PROMPT = (
-    "You are the banking service specialist and MCP tool selector. Handle only "
-    "checkbook, mailing address, and credit-limit questions. Select the relevant "
-    "MCP tool before answering. Use only MCP results; never invent service data."
-)
-
 
 def get_checkbook() -> dict:
     """Call the Service MCP server for checkbook information."""
@@ -38,7 +32,7 @@ class ServiceAgent:
     def __init__(self) -> None:
         self._client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
         self._config = types.GenerateContentConfig(
-            system_instruction=SYSTEM_PROMPT,
+            system_instruction=get_prompt("service_specialist").text,
             tools=[get_checkbook, get_customer_address, get_customer_credit_limit],
         )
 
