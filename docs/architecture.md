@@ -44,13 +44,18 @@ ui/app.py --per message-->  gateway/api.get_response(message, history, principal
                                  |
                                  v
                            LangGraph coordinator
-                            /          \
+                            /          \\
                              v            v
-                         specialist tools   BankingAgent
-                                    |
-                                    v
-                                  Gemini API
+                     authorized MCP tools   local complexity policy
+                               |              /             \\
+                               v             v               v
+                         verified results  Ollama       Gemini escalation
+                                           (routine)      (complex only)
 ```
+
+Intent routing is local keyword logic. Routine answer drafting uses the
+self-hosted model; only requests marked analytically complex use the configured
+third-party model. PII redaction runs before model prompts are sent.
 
 `gateway/backend.py` is the one seam between the UI process and the
 backend process — it's the only module that knows the backend lives over

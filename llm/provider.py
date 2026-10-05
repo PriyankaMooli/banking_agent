@@ -7,6 +7,8 @@ from typing import Any
 
 import httpx
 
+from privacy.redaction import redact_pii, sanitize_for_llm
+
 
 class OpenWeightReasoningModel:
     """OpenAI-compatible local model client for a self-hosted LLM server."""
@@ -17,24 +19,37 @@ class OpenWeightReasoningModel:
         self.model = os.environ.get("SELF_HOSTED_LLM_MODEL", "llama3.1:8b")
         self.enabled = os.environ.get("USE_SELF_HOSTED_LLM", "false").lower() in {"1", "true", "yes", "on"}
 
-    def _build_messages(self, prompt: str, history: list[dict[str, str]] | None = None) -> list[dict[str, str]]:
+    def _build_messages(
+        self,
+        prompt: str,
+        history: list[dict[str, str]] | None = None,
+        system_instruction: str | None = None,
+    ) -> list[dict[str, str]]:
+        safe_prompt, safe_history = sanitize_for_llm(prompt, history)
         messages: list[dict[str, str]] = []
-        for turn in history or []:
+        if system_instruction:
+            messages.append({"role": "system", "content": redact_pii(system_instruction)})
+        for turn in safe_history:
             role = turn.get("role")
             content = turn.get("content", "")
             if role in {"user", "assistant"}:
                 messages.append({"role": role, "content": content})
-        messages.append({"role": "user", "content": prompt})
+        messages.append({"role": "user", "content": safe_prompt})
         return messages
 
-    def generate(self, prompt: str, history: list[dict[str, str]] | None = None) -> str:
+    def generate(
+        self,
+        prompt: str,
+        history: list[dict[str, str]] | None = None,
+        system_instruction: str | None = None,
+    ) -> str:
         if not self.enabled:
             raise RuntimeError("Self-hosted LLM is disabled; set USE_SELF_HOSTED_LLM=true")
 
         url = f"{self.base_url.rstrip('/')}/chat/completions"
         payload: dict[str, Any] = {
             "model": self.model,
-            "messages": self._build_messages(prompt, history),
+            "messages": self._build_messages(prompt, history, system_instruction),
             "temperature": 0.2,
         }
         response = httpx.post(

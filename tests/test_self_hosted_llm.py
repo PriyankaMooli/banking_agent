@@ -28,10 +28,20 @@ def test_self_hosted_model_builds_openai_compatible_payload(monkeypatch):
     monkeypatch.setattr("llm.provider.httpx.post", fake_post)
 
     llm = OpenWeightReasoningModel()
-    result = llm.generate("Hello", [{"role": "user", "content": "Prior context"}])
+    result = llm.generate(
+        "Email alice@example.com, account number: 123456789012",
+        [{"role": "user", "content": "Mail to 123 Main Street, Springfield, NY 10001"}],
+        system_instruction="Contact alice@example.com only if needed.",
+    )
 
     assert result == "Local answer"
     assert captured["url"] == "http://localhost:11434/v1/chat/completions"
     assert captured["headers"]["Authorization"] == "Bearer ollama"
     assert captured["json"]["model"] == "llama3.1:8b"
-    assert captured["json"]["messages"][-1]["content"] == "Hello"
+    sent_text = " ".join(message["content"] for message in captured["json"]["messages"])
+    assert "alice@example.com" not in sent_text
+    assert "123456789012" not in sent_text
+    assert "123 Main Street" not in sent_text
+    assert "[EMAIL]" in sent_text
+    assert "[ACCOUNT_NUMBER]" in sent_text
+    assert "[ADDRESS]" in sent_text

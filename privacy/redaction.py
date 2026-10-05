@@ -12,11 +12,25 @@ PHONE_RE = re.compile(
 )
 SSN_RE = re.compile(r"(?<!\d)\d{3}-\d{2}-\d{4}(?!\d)")
 CARD_RE = re.compile(r"(?<!\d)(?:\d[ -]?){13,19}(?!\d)")
+ACCOUNT_NUMBER_RE = re.compile(
+    r"\b(account(?:\s+(?:number|no\.?))?|acct\.?\s*(?:number|no\.?|#))\s*[:#-]?\s*(?:\d[ -]?){6,20}(?!\d)",
+    re.IGNORECASE,
+)
+ADDRESS_RE = re.compile(
+    r"\b\d{1,6}\s+(?:[A-Za-z0-9.'-]+\s+){0,5}"
+    r"(?:Street|St|Avenue|Ave|Road|Rd|Boulevard|Blvd|Drive|Dr|Lane|Ln|"
+    r"Court|Ct|Way|Parkway|Pkwy)\.?"
+    r"(?:,?\s+[A-Za-z][A-Za-z .'-]*)?(?:,\s*[A-Z]{2})?"
+    r"(?:\s+\d{5}(?:-\d{4})?)?\b",
+    re.IGNORECASE,
+)
 
 
 def redact_pii(text: str) -> str:
     """Replace common personal information with neutral placeholders."""
     redacted = text
+    redacted = ACCOUNT_NUMBER_RE.sub("[ACCOUNT_NUMBER]", redacted)
+    redacted = ADDRESS_RE.sub("[ADDRESS]", redacted)
     redacted = EMAIL_RE.sub("[EMAIL]", redacted)
     redacted = PHONE_RE.sub("[PHONE]", redacted)
     redacted = SSN_RE.sub("[SSN]", redacted)

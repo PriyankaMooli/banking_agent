@@ -22,16 +22,18 @@ user-info claim or the `privileged` / `banking-privileged` role in user-info
 data to grant elevated access. The `raise_customer_credit_limit` policy is
 privileged-only, but the mutation tool has not been implemented yet.
 
-The coordinator uses the Gemini-based intent classifier to route flexible user
-wording to the appropriate specialist. If the classifier is unavailable, it
-falls back to the coordinator's keyword routes.
+Set `USE_SELF_HOSTED_LLM=true` and configure an OpenAI-compatible local endpoint
+such as Ollama (`SELF_HOSTED_LLM_BASE_URL=http://localhost:11434/v1`) and a
+model name such as `llama3.1:8b`. Routine replies use this self-hosted model;
+banking facts are fetched through the authorized MCP tools.
 
-For in-boundary local reasoning, set `USE_SELF_HOSTED_LLM=true` with a local
-OpenAI-compatible endpoint such as Ollama (`SELF_HOSTED_LLM_BASE_URL=http://localhost:11434/v1`)
-and a matching model name like `llama3.1:8b`. When enabled, the general
-banking reasoning path uses the self-hosted model as its primary backend and
-keeps Gemini as the fallback for other specialist flows unless a local model is
-configured for those as well.
+Gemini is used only for requests flagged by the local complexity policy (for
+example, comparisons, trends, recommendations, causal questions, multiple
+questions, or requests spanning multiple banking topics). Set `GEMINI_API_KEY`
+and optionally `THIRD_PARTY_LLM_MODEL` to enable that escalation. Requests and
+history are passed through PII redaction before being sent to either model.
+If local reasoning is disabled, routine requests fail rather than being sent to
+a third-party model.
 
 The Accounts MCP server exposes the typed `get_account_balance` tool over
 stdio. Chainlit starts it automatically when MCP is enabled in

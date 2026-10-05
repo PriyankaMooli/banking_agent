@@ -4,13 +4,14 @@ from typing import TypedDict
 
 from langgraph.graph import END, START, StateGraph
 
-from agent.accounts import AccountsAgent
+from agent.accounts import get_account_balance
 from agent.agent import BankingAgent
-from agent.intent_classifier import IntentClassifier
-from agent.service import ServiceAgent
-from agent.transactions import TransactionsAgent
+from agent.service import get_checkbook, get_customer_address, get_customer_credit_limit
+from agent.transactions import get_account_transactions
 from agent.tools import get_card_status, get_loan_status
 from identity.authorization import use_principal
+from llm.escalation import ThirdPartyReasoningModel
+from llm.routing import requires_external_reasoning
 
 
 class CoordinatorState(TypedDict):
@@ -22,11 +23,6 @@ class CoordinatorState(TypedDict):
     findings: list[tuple[str, object]]
     reply: str
 
-
-SPECIALISTS = {
-    "card": get_card_status,
-    "loan": get_loan_status,
-}
 
 INTENT_KEYWORDS = {
     "balance": ("balance", "checking", "savings", "account"),
@@ -48,28 +44,36 @@ def _keyword_plan(message: str) -> list[str]:
     return plan
 
 
-def _plan(state: CoordinatorState, classifier: IntentClassifier | None = None) -> dict:
-    message = state["message"].lower()
-    try:
-        plan = classifier.classify(state["message"]) if classifier else _keyword_plan(message)
-    except Exception:
-        plan = _keyword_plan(message)
-    return {"plan": plan, "next_agent": 0}
+def _plan(state: CoordinatorState) -> dict:
+    return {"plan": _keyword_plan(state["message"].lower()), "next_agent": 0}
 
 
 def _dispatch(state: CoordinatorState) -> dict:
     if state["next_agent"] >= len(state["plan"]):
         return {}
     specialist_name = state["plan"][state["next_agent"]]
+    message = state["message"].lower()
     with use_principal(state["principal"]):
         if specialist_name == "balance":
-            result = AccountsAgent().run(state["message"], state["history"])
+            accounts = []
+            if "checking" in message or "savings" not in message:
+                accounts.append("checking")
+            if "savings" in message:
+                accounts.append("savings")
+            result = {account: get_account_balance(account) for account in accounts}
         elif specialist_name == "transactions":
-            result = TransactionsAgent().run(state["message"], state["history"])
+            result = get_account_transactions()
         elif specialist_name == "service":
-            result = ServiceAgent().run(state["message"], state["history"])
+            if "credit limit" in message or "credit-limit" in message:
+                result = get_customer_credit_limit()
+            elif "checkbook" in message or "check" in message:
+                result = get_checkbook()
+            else:
+                result = get_customer_address()
+        elif specialist_name == "card":
+            result = get_card_status()
         else:
-            result = SPECIALISTS[specialist_name]()
+            result = get_loan_status()
     return {
         "findings": [*state["findings"], (specialist_name, result)],
         "next_agent": state["next_agent"] + 1,
@@ -83,23 +87,41 @@ def _route(state: CoordinatorState) -> str:
 
 
 def _respond(state: CoordinatorState) -> dict:
+    message = state["message"]
+    history = state["history"]
+    if history and history[-1].get("role") == "user" and history[-1].get("content") == message:
+        history = history[:-1]
+
+    if state["findings"]:
+        findings = "\n".join(f"{name}: {result}" for name, result in state["findings"])
+        prompt = (
+            f"User request: {message}\n"
+            f"Verified tool results: {findings}\n\n"
+            "Answer using only these verified results. If they do not contain "
+            "the information requested, say what is unavailable. Be concise and friendly."
+        )
+    else:
+        prompt = message
+
     with use_principal(state["principal"]):
-        if not state["findings"]:
-            reply = BankingAgent().run(state["message"], state["history"])
-        else:
-            findings = "\n".join(f"{name}: {result}" for name, result in state["findings"])
-            prompt = (
-                f"User request: {state['message']}\n"
-                f"Verified specialist results:\n{findings}\n\n"
-                "Answer the user using only these verified results. Be concise and friendly."
+        if requires_external_reasoning(message):
+            reply = ThirdPartyReasoningModel().generate(
+                prompt,
+                history,
+                system_instruction=(
+                    "You are a banking assistant handling a complex reasoning request. "
+                    "Use only the supplied verified tool results for account facts. "
+                    "Never invent financial information."
+                ),
             )
-            reply = BankingAgent().run(prompt, state["history"])
+        else:
+            reply = BankingAgent().run(prompt, history)
     return {"reply": reply}
 
 
-def _build_graph(classifier: IntentClassifier | None = None):
+def _build_graph():
     graph = StateGraph(CoordinatorState)
-    graph.add_node("plan", lambda state: _plan(state, classifier))
+    graph.add_node("plan", _plan)
     graph.add_node("dispatch", _dispatch)
     graph.add_node("respond", _respond)
     graph.add_edge(START, "plan")
@@ -113,11 +135,7 @@ class CoordinatorAgent:
     """Plan and run the specialist agents needed for a banking request."""
 
     def __init__(self) -> None:
-        try:
-            classifier = IntentClassifier()
-        except Exception:
-            classifier = None
-        self._graph = _build_graph(classifier)
+        self._graph = _build_graph()
 
     def run(self, message: str, history: list[dict], principal: dict[str, str]) -> str:
         result = self._graph.invoke(
