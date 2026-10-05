@@ -16,6 +16,7 @@ from google.genai import types
 from agent.accounts import get_account_balance
 from agent.tools import get_card_status, get_loan_status
 from agent.transactions import get_account_transactions
+from llm.provider import create_reasoning_model
 from privacy.redaction import sanitize_for_llm
 
 MODEL = "gemini-3.5-flash-lite"
@@ -30,6 +31,10 @@ SYSTEM_PROMPT = (
 
 class BankingAgent:
     def __init__(self) -> None:
+        self._reasoning_model = create_reasoning_model()
+        if self._reasoning_model is not None:
+            self._client = None
+            return
         self._client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
         self._config = types.GenerateContentConfig(
             system_instruction=SYSTEM_PROMPT,
@@ -39,6 +44,9 @@ class BankingAgent:
     def run(self, message: str, history: list[dict]) -> str:
         """Answer one user message, using tools as needed, and return the reply text."""
         safe_message, safe_history = sanitize_for_llm(message, history)
+        if self._reasoning_model is not None:
+            return self._reasoning_model.generate(safe_message, safe_history)
+
         chat = self._client.chats.create(
             model=MODEL,
             config=self._config,

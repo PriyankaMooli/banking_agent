@@ -26,6 +26,13 @@ The coordinator uses the Gemini-based intent classifier to route flexible user
 wording to the appropriate specialist. If the classifier is unavailable, it
 falls back to the coordinator's keyword routes.
 
+For in-boundary local reasoning, set `USE_SELF_HOSTED_LLM=true` with a local
+OpenAI-compatible endpoint such as Ollama (`SELF_HOSTED_LLM_BASE_URL=http://localhost:11434/v1`)
+and a matching model name like `llama3.1:8b`. When enabled, the general
+banking reasoning path uses the self-hosted model as its primary backend and
+keeps Gemini as the fallback for other specialist flows unless a local model is
+configured for those as well.
+
 The Accounts MCP server exposes the typed `get_account_balance` tool over
 stdio. Chainlit starts it automatically when MCP is enabled in
 `.chainlit/config.toml`; it can also be run directly with:
