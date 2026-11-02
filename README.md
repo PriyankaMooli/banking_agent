@@ -1,1 +1,56 @@
 # banking_agent
+
+Chat UI skeleton for a banking assistant. See [docs/architecture.md](docs/architecture.md) for the folder layout.
+
+## Run
+
+```
+pip install -r requirements.txt
+cp .env.example .env   # fill in GEMINI_API_KEY, Keycloak values, and secrets
+
+uvicorn backend.main:app --port 8001   # backend API + agent layer
+chainlit run ui/app.py                 # chat UI (separate terminal)
+```
+
+Set `CHAINLIT_AUTH_SECRET` with `chainlit create-secret` and set
+`AUTHZ_SHARED_SECRET` to a random value (for example, `openssl rand -hex 32`).
+The UI and backend must load the same `AUTHZ_SHARED_SECRET`; keep it server-side.
+
+Tools are checked against a deny-by-default tier policy before execution.
+Users default to `customer`; Keycloak must expose either a `tier: privileged`
+user-info claim or the `privileged` / `banking-privileged` role in user-info
+data to grant elevated access. The `raise_customer_credit_limit` policy is
+privileged-only, but the mutation tool has not been implemented yet.
+
+Set `USE_SELF_HOSTED_LLM=true` and configure an OpenAI-compatible local endpoint
+such as Ollama (`SELF_HOSTED_LLM_BASE_URL=http://localhost:11434/v1`) and a
+model name such as `llama3.1:8b`. Routine replies use this self-hosted model;
+banking facts are fetched through the authorized MCP tools.
+
+Gemini is used only for requests flagged by the local complexity policy (for
+example, comparisons, trends, recommendations, causal questions, multiple
+questions, or requests spanning multiple banking topics). Set `GEMINI_API_KEY`
+and optionally `THIRD_PARTY_LLM_MODEL` to enable that escalation. Requests and
+history are passed through PII redaction before being sent to either model.
+If local reasoning is disabled, routine requests fail rather than being sent to
+a third-party model.
+
+The Accounts MCP server exposes the typed `get_account_balance` tool over
+stdio. Chainlit starts it automatically when MCP is enabled in
+`.chainlit/config.toml`; it can also be run directly with:
+
+```
+python -m agent.accounts_mcp
+```
+
+The Transactions MCP server exposes the typed `get_account_transactions` tool:
+
+```
+python -m agent.transactions_mcp
+```
+
+The Service MCP server exposes typed checkbook, address, and credit-limit tools:
+
+```
+python -m agent.service_mcp
+```

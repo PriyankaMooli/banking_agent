@@ -1,0 +1,8 @@
+chainlit
+fastapi
+uvicorn[standard]
+google-genai
+langgraph
+mcp
+httpx
+python-dotenv
